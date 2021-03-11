@@ -30,10 +30,25 @@ type Storage () =
         | (true, game) -> game
         | (false, _) -> Game.create defaultGameTitle defaultVoteChoices
 
+    member __.UpdateGame gameId game =
+        games.[gameId] <- game
+
+        games.[gameId]
+
+    member __.Vote gameId playerName effort =
+        let game = __.GetGame gameId
+
+        let currentRound = game.CurrentRound
+
+        let newRound = { currentRound with Votes = (Map.add playerName effort currentRound.Votes) }
+
+        __.UpdateGame gameId { game with CurrentRound = newRound }
+
 let storage = Storage()
 
 let gameApi =
-    { getGame = fun gameId -> async { return storage.GetGame gameId } }
+    { getGame = fun (gameId) -> async { return storage.GetGame gameId }
+      vote = fun (gameId, playerName, effort) -> async { return storage.Vote gameId playerName effort } }
 
 let webApp =
     Remoting.createApi()

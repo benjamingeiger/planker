@@ -40,7 +40,9 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         { model with Game = Resolved game }, Cmd.none
 
     | Vote effort ->
-        { model with CurrentVote = Some effort }, Cmd.none
+        let cmd = Cmd.OfAsync.perform gameApi.vote (model.GameId, model.PlayerName, effort) (fun _ -> LoadGame Started)
+
+        { model with CurrentVote = Some effort }, cmd
 
 open Fable.React
 open Fable.React.Props
