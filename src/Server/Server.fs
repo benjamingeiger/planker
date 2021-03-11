@@ -4,39 +4,41 @@ open Fable.Remoting.Server
 open Fable.Remoting.Giraffe
 open Saturn
 
+open System.Collections.Generic
+
 open Shared
 
+let defaultGameTitle = "default title"
+
+let defaultVoteChoices = [
+    Symbolic "1"
+    Symbolic "2"
+    Symbolic "3"
+    Symbolic "5"
+    Symbolic "8"
+    Symbolic "13"
+    Symbolic "21"
+    Symbolic "?"
+    Symbolic "Coffee"
+]
+
 type Storage () =
-    let todos = ResizeArray<_>()
+    let games = Dictionary<string, Game>()
 
-    member __.GetTodos () =
-        List.ofSeq todos
-
-    member __.AddTodo (todo: Todo) =
-        if Todo.isValid todo.Description then
-            todos.Add todo
-            Ok ()
-        else Error "Invalid todo"
+    member __.GetGame gameId =
+        match games.TryGetValue(gameId) with
+        | (true, game) -> game
+        | (false, _) -> Game.create defaultGameTitle defaultVoteChoices
 
 let storage = Storage()
 
-storage.AddTodo(Todo.create "Create new SAFE project") |> ignore
-storage.AddTodo(Todo.create "Write your app") |> ignore
-storage.AddTodo(Todo.create "Ship it !!!") |> ignore
-
-let todosApi =
-    { getTodos = fun () -> async { return storage.GetTodos() }
-      addTodo =
-        fun todo -> async {
-            match storage.AddTodo todo with
-            | Ok () -> return todo
-            | Error e -> return failwith e
-        } }
+let gameApi =
+    { getGame = fun gameId -> async { return storage.GetGame gameId } }
 
 let webApp =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue todosApi
+    |> Remoting.fromValue gameApi
     |> Remoting.buildHttpHandler
 
 let app =

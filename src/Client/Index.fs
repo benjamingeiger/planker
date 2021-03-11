@@ -5,109 +5,78 @@ open Fable.Remoting.Client
 open Shared
 
 type Model =
-    { Todos: Todo list
-      Input: string }
+    { GameId: string
+      Game: Deferred<Game>
+      PlayerName: string
+      CurrentVote: Effort option }
 
 type Msg =
-    | GotTodos of Todo list
-    | SetInput of string
-    | AddTodo
-    | AddedTodo of Todo
+    | LoadGame of AsyncOperationStatus<Game>
+    | Vote of Effort
 
-let todosApi =
+let gameApi =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.buildProxy<ITodosApi>
+    |> Remoting.buildProxy<IGameApi>
 
 let init(): Model * Cmd<Msg> =
     let model =
-        { Todos = []
-          Input = "" }
-    let cmd = Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+        { GameId = "default"
+          Game = NotStartedYet
+          PlayerName = "Derpy"
+          CurrentVote = None }
+
+    let cmd = Cmd.ofMsg (LoadGame Started)
     model, cmd
 
 let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
     match msg with
-    | GotTodos todos ->
-        { model with Todos = todos }, Cmd.none
-    | SetInput value ->
-        { model with Input = value }, Cmd.none
-    | AddTodo ->
-        let todo = Todo.create model.Input
-        let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
-        { model with Input = "" }, cmd
-    | AddedTodo todo ->
-        { model with Todos = model.Todos @ [ todo ] }, Cmd.none
+    | LoadGame (Started) ->
+        let cmd = Cmd.OfAsync.perform gameApi.getGame model.GameId (fun r -> LoadGame (Finished r))
+
+        { model with Game = InProgress }, cmd
+
+    | LoadGame (Finished game) ->
+        { model with Game = Resolved game }, Cmd.none
+
+    | Vote effort ->
+        { model with CurrentVote = Some effort }, Cmd.none
 
 open Fable.React
 open Fable.React.Props
+open Feliz
 open Fulma
 
-let navBrand =
-    Navbar.Brand.div [ ] [
-        Navbar.Item.a [
-            Navbar.Item.Props [ Href "https://safe-stack.github.io/" ]
-            Navbar.Item.IsActive true
-        ] [
-            img [
-                Src "/favicon.png"
-                Alt "Logo"
-            ]
-        ]
-    ]
-
-let containerBox (model : Model) (dispatch : Msg -> unit) =
-    Box.box' [ ] [
-        Content.content [ ] [
-            Content.Ol.ol [ ] [
-                for todo in model.Todos do
-                    li [ ] [ str todo.Description ]
-            ]
-        ]
-        Field.div [ Field.IsGrouped ] [
-            Control.p [ Control.IsExpanded ] [
-                Input.text [
-                  Input.Value model.Input
-                  Input.Placeholder "What needs to be done?"
-                  Input.OnChange (fun x -> SetInput x.Value |> dispatch) ]
-            ]
-            Control.p [ ] [
-                Button.a [
-                    Button.Color IsPrimary
-                    Button.Disabled (Todo.isValid model.Input |> not)
-                    Button.OnClick (fun _ -> dispatch AddTodo)
-                ] [
-                    str "Add"
-                ]
-            ]
-        ]
-    ]
-
 let view (model : Model) (dispatch : Msg -> unit) =
-    Hero.hero [
-        Hero.Color IsPrimary
-        Hero.IsFullHeight
-        Hero.Props [
-            Style [
-                Background """linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("https://unsplash.it/1200/900?random") no-repeat center center fixed"""
-                BackgroundSize "cover"
-            ]
-        ]
-    ] [
-        Hero.head [ ] [
-            Navbar.navbar [ ] [
-                Container.container [ ] [ navBrand ]
+    let choices game =
+        Html.div [
+            prop.children [
+                for choice in game.VoteChoices ->
+                    match choice with
+                    | Symbolic label ->
+                        Html.button [
+                            prop.onClick (fun _ -> dispatch (Vote choice))
+                            prop.text label
+                        ]
             ]
         ]
 
-        Hero.body [ ] [
-            Container.container [ ] [
-                Column.column [
-                    Column.Width (Screen.All, Column.Is6)
-                    Column.Offset (Screen.All, Column.Is3)
-                ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "Planker" ]
-                    containerBox model dispatch
+    Html.div [
+        prop.style [
+            style.padding 20
+        ]
+        prop.children [
+            Html.p [
+                prop.className "title"
+                prop.text "HERP DERP TURTLES"
+            ]
+
+            Html.div [
+                prop.children [
+                    match model.Game with
+                    | NotStartedYet -> Html.i [ prop.text "Game not loaded." ]
+                    | InProgress -> Html.i [ prop.text "Loading..." ]
+                    | Resolved game -> choices game
                 ]
             ]
         ]
