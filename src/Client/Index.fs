@@ -52,11 +52,13 @@ open Fulma
 let view (model : Model) (dispatch : Msg -> unit) =
     let choices game =
         Html.div [
+            prop.classes [ "field"; "is-grouped" ]
             prop.children [
                 for choice in game.VoteChoices ->
                     match choice with
                     | Symbolic label ->
                         Html.button [
+                            prop.classes [ "button"; if Some choice = model.CurrentVote then "is-info is-selected" ]
                             prop.onClick (fun _ -> dispatch (Vote choice))
                             prop.text label
                         ]
