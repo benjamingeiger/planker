@@ -37,7 +37,11 @@ let update (msg: Msg) (model: Model): Model * Cmd<Msg> =
         { model with Game = InProgress }, cmd
 
     | LoadGame (Finished game) ->
-        { model with Game = Resolved game }, Cmd.none
+        let vote = Map.tryFind model.PlayerName game.CurrentRound.Votes
+
+        { model with
+            Game = Resolved game
+            CurrentVote = vote }, Cmd.none
 
     | Vote effort ->
         let cmd = Cmd.OfAsync.perform gameApi.vote (model.GameId, model.PlayerName, effort) (fun _ -> LoadGame Started)
